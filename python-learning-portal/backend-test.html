@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backend Test</title>
+</head>
+<body>
+    <h1>Backend Status Test</h1>
+    <div id="status">Testing...</div>
+    <div id="exercises">Loading exercises...</div>
+    
+    <script>
+        async function testBackend() {
+            const statusDiv = document.getElementById('status');
+            const exercisesDiv = document.getElementById('exercises');
+            
+            try {
+                // Test health endpoint
+                const healthResponse = await fetch('http://localhost:3050/health');
+                if (healthResponse.ok) {
+                    statusDiv.innerHTML = '✅ Backend is running';
+                    statusDiv.style.color = 'green';
+                    
+                    // Test exercises endpoint
+                    try {
+                        const exercisesResponse = await fetch('http://localhost:3050/api/exercises');
+                        const exercises = await exercisesResponse.json();
+                        
+                        if (exercises.success && exercises.data.length > 0) {
+                            exercisesDiv.innerHTML = `✅ Found ${exercises.data.length} exercises in database`;
+                            exercisesDiv.style.color = 'green';
+                        } else {
+                            exercisesDiv.innerHTML = '❌ No exercises found in database';
+                            exercisesDiv.style.color = 'red';
+                        }
+                    } catch (err) {
+                        exercisesDiv.innerHTML = '❌ Error fetching exercises: ' + err.message;
+                        exercisesDiv.style.color = 'red';
+                    }
+                } else {
+                    statusDiv.innerHTML = '❌ Backend responded with error';
+                    statusDiv.style.color = 'red';
+                }
+            } catch (err) {
+                statusDiv.innerHTML = '❌ Backend is not running: ' + err.message;
+                statusDiv.style.color = 'red';
+                exercisesDiv.innerHTML = '❌ Cannot test exercises (backend down)';
+                exercisesDiv.style.color = 'red';
+            }
+        }
+        
+        testBackend();
+    </script>
+</body>
+</html>
