@@ -137,3 +137,25 @@ backend/uploads/
 
 # Frontend specific
 frontend/.vite/
+# Test artifacts and reports (should never be committed)
+playwright-report/
+test-results/
+.playwright-mcp/
+
+# Development test files
+*-test.html
+backend-test.html
+
+# Temporary and cleanup scripts
+SAFE-CLEANUP.*
+*cleanup*script*
+
+# Backup and temporary source files
+*_original.*
+*_backup.*
+temp_*
+
+# TypeScript build artifacts that shouldn't be committed
+shared/*.js
+shared/*.js.map
+shared/*.d.ts.map
