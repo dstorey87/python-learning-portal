@@ -125,9 +125,11 @@ tmp/
 *.tmp
 
 # Database files (keep structure but ignore runtime data)
+*.sqlite
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
+*.db
 
 # Backend specific
 backend/temp/
