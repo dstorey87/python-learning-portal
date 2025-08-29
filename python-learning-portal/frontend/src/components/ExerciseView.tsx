@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from 'react-query'
-import { Play, RotateCcw, Eye, EyeOff, Lightbulb, CheckCircle, Terminal as TerminalIcon } from 'lucide-react'
+import { Play, RotateCcw, Eye, EyeOff, Lightbulb, CheckCircle } from 'lucide-react'
 import { MonacoEditor } from './MonacoEditor'
 import { TestResults } from './TestResults'
 import { SolutionView } from './SolutionView'

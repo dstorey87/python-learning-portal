@@ -22,7 +22,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ className = 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
       
-      const response = await fetch('http://localhost:3050/health', {
+      const response = await fetch('/health', {
         method: 'GET',
         signal: controller.signal
       });

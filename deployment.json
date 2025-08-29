@@ -1,0 +1,21 @@
+{
+  "containers": {
+    "python-portal": {
+      "image": ":python-portal-real.python-working-v3.13",
+      "environment": {
+        "NODE_ENV": "production",
+        "PORT": "3050"
+      },
+      "ports": {
+        "3050": "HTTP"
+      }
+    }
+  },
+  "publicEndpoint": {
+    "containerName": "python-portal",
+    "containerPort": 3050,
+    "healthCheck": {
+      "path": "/health"
+    }
+  }
+}

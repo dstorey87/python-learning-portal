@@ -4,7 +4,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { initializeDatabase, getDatabase } from '../database/init';
 import { Exercise } from '../types';
 
-const EXERCISES_ROOT = 'C:\\Users\\darre\\Downloads\\python_foundations_exercises\\python_foundations_exercises\\exercises';
+// Configuration - point to the actual exercises directory
+// Use environment-specific path: Docker container vs local development
+const EXERCISES_ROOT = process.env.NODE_ENV === 'production' || process.cwd().includes('/app/')
+  ? '/app/exercises'  // Docker container path
+  : 'C:\\Users\\darre\\Downloads\\python_foundations_exercises\\python_foundations_exercises\\exercises'; // Local development path
 
 interface ExerciseMetadata {
   difficulty: 'beginner' | 'intermediate' | 'advanced';

@@ -3,11 +3,12 @@ import { APIResponse } from '@shared/types'
 
 // Create axios instance with base configuration
 const getApiBaseUrl = () => {
-  // Check if we're in development and have a Vite environment variable
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) {
-    return (import.meta as any).env.VITE_API_URL
+  // In production/Docker, use relative URLs since frontend and backend are served from same origin
+  if (typeof window !== 'undefined') {
+    return '/api'
   }
-  // Default to port 3050 which is our backend port
+  
+  // Fallback for development
   return 'http://localhost:3050/api'
 }
 
