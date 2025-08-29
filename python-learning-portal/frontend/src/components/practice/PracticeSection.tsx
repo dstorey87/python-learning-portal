@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { exerciseApi } from '../../api/exerciseApi'
 import { useAppStore } from '../../store/appStore'
-import { Exercise } from '@shared/types'
+import { Exercise } from '@portal/types'
 
 // Exercise categories with their metadata
 const EXERCISE_CATEGORIES = [

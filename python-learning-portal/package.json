@@ -2,17 +2,27 @@
   "name": "python-learning-portal",
   "version": "1.0.0",
   "description": "Interactive Python learning portal with live code execution",
+  "workspaces": [
+    "packages/@portal/*",
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:types\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:types": "cd packages/@portal/types && npm run dev",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
-    "build": "npm run build:backend && npm run build:frontend",
+    "build": "npm run build:types && npm run build:backend && npm run build:frontend",
+    "build:types": "cd packages/@portal/types && npm run build",
     "build:backend": "cd backend && npm run build",
     "build:frontend": "cd frontend && npm run build",
     "start": "cd backend && npm start",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+    "install:all": "npm install && cd packages/@portal/types && npm install && cd ../../../backend && npm install && cd ../frontend && npm install",
+    "lint": "cd packages/@portal/types && npm run lint && cd ../../../backend && npm run lint && cd ../frontend && npm run lint",
+    "lint:fix": "cd packages/@portal/types && npm run lint:fix && cd ../../../backend && npm run lint:fix && cd ../frontend && npm run lint:fix",
+    "clean": "cd packages/@portal/types && npm run clean"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs/promises';
-import { CodeExecution, CodeExecutionResult, TestResult, APIResponse, AppError } from '../types';
+import { CodeExecution, CodeExecutionResult, TestResult, APIResponse, AppError } from '@portal/types';
 
 const router = Router();
 const PYTHON_TIMEOUT = 3000; // Reduced to 3 seconds for much faster feedback

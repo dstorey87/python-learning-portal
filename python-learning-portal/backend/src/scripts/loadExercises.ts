@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { initializeDatabase, getDatabase } from '../database/init';
-import { Exercise } from '../types';
+import { Exercise } from '@portal/types';
 
 // Configuration - point to the actual exercises directory
 // Use environment-specific path: Docker container vs local development

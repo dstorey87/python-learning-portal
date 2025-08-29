@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { Exercise, User, UserProgress, TestResult, UIState } from '@shared/types'
+import { Exercise, User, UserProgress, TestResult, UIState } from '@portal/types'
 
 interface AppState extends UIState {
   // User state

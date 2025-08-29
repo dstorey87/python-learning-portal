@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { APIResponse } from '@shared/types'
+import { APIResponse } from '@portal/types'
 
 // Create axios instance with base configuration
 const getApiBaseUrl = () => {

@@ -25,12 +25,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../shared/*"]
+      "@portal/types": ["../packages/@portal/types/src/index"]
     }
   },
   "include": [
     "src/**/*",
-    "../shared/**/*"
+    "../packages/@portal/types/src/**/*"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

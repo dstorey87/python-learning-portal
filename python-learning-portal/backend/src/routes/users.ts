@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDatabase } from '../database/init';
 import { v4 as uuidv4 } from 'uuid';
-import { APIResponse, User, AppError } from '../types';
+import { APIResponse, User, AppError } from '@portal/types';
 
 const router = Router();
 

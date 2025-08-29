@@ -1,5 +1,5 @@
 import { apiClient, handleApiResponse } from './client'
-import { Exercise, APIResponse, Hint } from '@shared/types'
+import { Exercise, APIResponse, Hint } from '@portal/types'
 
 export const exerciseApi = {
   async getAllExercises(): Promise<Exercise[]> {

@@ -1,5 +1,5 @@
 import { CheckCircle, XCircle, Clock } from 'lucide-react'
-import { TestResult } from '@shared/types'
+import { TestResult } from '@portal/types'
 
 interface TestResultsProps {
   results: TestResult

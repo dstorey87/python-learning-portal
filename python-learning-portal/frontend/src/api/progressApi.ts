@@ -1,5 +1,5 @@
 import { apiClient, handleApiResponse } from './client'
-import { UserProgress, APIResponse } from '@shared/types'
+import { UserProgress, APIResponse } from '@portal/types'
 
 export const progressApi = {
   async getUserProgress(userId: string): Promise<UserProgress[]> {

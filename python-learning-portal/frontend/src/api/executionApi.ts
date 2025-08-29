@@ -1,5 +1,5 @@
 import { apiClient, handleApiResponse } from './client'
-import { CodeExecution, CodeExecutionResult, APIResponse } from '@shared/types'
+import { CodeExecution, CodeExecutionResult, APIResponse } from '@portal/types'
 
 export const executionApi = {
   async runCode(codeExecution: CodeExecution): Promise<CodeExecutionResult> {

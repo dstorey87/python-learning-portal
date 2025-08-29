@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from '../types';
+import { AppError } from '@portal/types';
 
 export const errorHandler = (
   error: Error | AppError,

@@ -21,12 +21,12 @@
     "exactOptionalPropertyTypes": false,
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../shared/*"]
+      "@portal/types": ["../packages/@portal/types/src/index"]
     }
   },
   "include": [
     "src/**/*",
-    "../shared/**/*"
+    "../packages/@portal/types/src/**/*"
   ],
   "exclude": [
     "node_modules",

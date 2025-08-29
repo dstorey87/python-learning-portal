@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDatabase } from '../database/init';
-import { Exercise, APIResponse, AppError } from '../types';
+import { Exercise, APIResponse, AppError } from '@portal/types';
 
 const router = Router();
 

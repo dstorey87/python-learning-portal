@@ -7,7 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': '/src',
-      '@shared': '/shared'
+      '@portal/types': '/packages/@portal/types/src/index.ts'
     }
   },
   server: {
