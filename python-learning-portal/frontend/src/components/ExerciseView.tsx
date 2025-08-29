@@ -6,7 +6,8 @@ import { MonacoEditor } from './MonacoEditor'
 import { TestResults } from './TestResults'
 import { SolutionView } from './SolutionView'
 import { HintsPanel } from './HintsPanel'
-import { Terminal, useTerminal } from './Terminal'
+import { Terminal } from './Terminal'
+import { useTerminal } from '../hooks/useTerminal'
 import { exerciseApi } from '../api/exerciseApi'
 import { executionApi } from '../api/executionApi'
 import { progressApi } from '../api/progressApi'
@@ -18,6 +19,7 @@ export const ExerciseView = () => {
   const navigate = useNavigate()
   const {
     user,
+    exercises,
     userCode,
     setUserCode,
     isRunning,
@@ -211,8 +213,16 @@ export const ExerciseView = () => {
   }
 
   const handleNextExercise = () => {
-    // TODO: Navigate to next exercise
-    toast('Next exercise navigation not implemented yet')
+    const currentIndex = exercises.findIndex(ex => ex.id === exercise?.id)
+    const nextExercise = exercises[currentIndex + 1]
+    
+    if (nextExercise) {
+      navigate(`/exercise/${nextExercise.id}`)
+    } else {
+      // If this is the last exercise, go back to practice
+      navigate('/practice')
+      toast('Congratulations! You\'ve completed all exercises in this section!')
+    }
   }
 
   if (isLoading) {

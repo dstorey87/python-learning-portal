@@ -30,6 +30,25 @@ router.get('/:id', async (req: Request, res: Response) => {
       WHERE user_id = ?
     `, [id]);
 
+    // Calculate streaks
+    const streakData = await db.get(`
+      WITH RECURSIVE streak_calc AS (
+        SELECT 
+          DATE(completed_at) as date,
+          ROW_NUMBER() OVER (ORDER BY DATE(completed_at) DESC) as rn,
+          DATE(completed_at, '+' || (ROW_NUMBER() OVER (ORDER BY DATE(completed_at) DESC) - 1) || ' days') as expected_date
+        FROM user_progress 
+        WHERE user_id = ? AND completed = 1 
+        AND completed_at IS NOT NULL
+        GROUP BY DATE(completed_at)
+        ORDER BY DATE(completed_at) DESC
+      )
+      SELECT 
+        COUNT(CASE WHEN date = expected_date THEN 1 END) as current_streak,
+        (SELECT COUNT(DISTINCT DATE(completed_at)) FROM user_progress WHERE user_id = ? AND completed = 1) as longest_streak
+      FROM streak_calc
+    `, [id, id]);
+
     const userProfile: User = {
       id: user.id,
       username: user.username,
@@ -37,8 +56,8 @@ router.get('/:id', async (req: Request, res: Response) => {
       createdAt: new Date(user.created_at),
       totalExercisesCompleted: stats?.total_completed || 0,
       totalTimeSpent: stats?.total_time_spent || 0,
-      currentStreak: 0, // TODO: Calculate streak
-      longestStreak: 0  // TODO: Calculate streak
+      currentStreak: streakData?.current_streak || 0,
+      longestStreak: streakData?.longest_streak || 0
     };
 
     const response: APIResponse<User> = {

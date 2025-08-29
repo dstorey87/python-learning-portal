@@ -9,10 +9,8 @@ const router = Router();
 router.get('/:userId/:exerciseId', async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, exerciseId } = req.params;
-    console.log('🔍 Progress API called with:', { userId, exerciseId });
     
     const db = getDatabase();
-    console.log('✅ Database connection obtained');
     
     const progressData = await db.get(`
       SELECT 
@@ -21,8 +19,6 @@ router.get('/:userId/:exerciseId', async (req: Request, res: Response): Promise<
       FROM user_progress 
       WHERE user_id = ? AND exercise_id = ?
     `, [userId, exerciseId]);
-
-    console.log('🔍 Progress query result:', progressData);
 
     let progress: UserProgress;
 
@@ -52,9 +48,7 @@ router.get('/:userId/:exerciseId', async (req: Request, res: Response): Promise<
       data: progress
     };
 
-    console.log('✅ Progress API responding with:', response);
     res.status(200).json(response);
-    console.log('✅ Progress API response sent successfully');
   } catch (error) {
     console.error('❌ Progress API error:', error);
     res.status(500).json({

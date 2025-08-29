@@ -1,7 +1,5 @@
 import { useRef } from 'react'
 
-import { useRef } from 'react'
-
 export interface TerminalRef {
   addOutput: (output: string) => void
   addError: (error: string) => void

@@ -44,7 +44,7 @@ export const Dashboard = () => {
     },
     {
       name: 'Streak',
-      value: 0, // TODO: Calculate streak
+      value: user?.currentStreak || 0,
       unit: 'days',
       icon: Star,
       color: 'text-purple-400 bg-purple-500/20',

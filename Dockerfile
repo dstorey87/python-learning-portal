@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Install Python for code execution
 RUN apk add --no-cache python3 py3-pip
