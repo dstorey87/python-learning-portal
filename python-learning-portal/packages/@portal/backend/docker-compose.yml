@@ -1,0 +1,39 @@
+# Docker Compose for @portal/backend development
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: portal-backend
+    ports:
+      - "3050:3050"
+    environment:
+      - NODE_ENV=development
+      - PORT=3050
+    volumes:
+      - ./data:/app/data
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http = require('http'); http.get('http://localhost:3050/health', (res) => { res.statusCode === 200 ? process.exit(0) : process.exit(1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Optional: Add database if moving away from SQLite
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: portal-db
+  #   environment:
+  #     POSTGRES_DB: python_portal
+  #     POSTGRES_USER: portal_user
+  #     POSTGRES_PASSWORD: secure_password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   postgres_data:

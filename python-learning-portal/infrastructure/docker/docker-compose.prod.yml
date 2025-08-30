@@ -1,0 +1,153 @@
+version: '3.8'
+
+services:
+  # Python code executor service
+  executor:
+    build:
+      context: ../../packages/@portal/executor
+      dockerfile: Dockerfile
+      target: production
+    container_name: python-portal-executor-prod
+    restart: unless-stopped
+    ports:
+      - "3003:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - portal-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+
+  # Backend API service
+  backend:
+    build:
+      context: ../../packages/@portal/backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: python-portal-backend-prod
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - FRONTEND_URL=https://python-portal-real.nf0keysv54fy8.eu-west-1.cs.amazonlightsail.com
+      - EXECUTOR_SERVICE_URL=http://executor:3000
+      - LOG_LEVEL=info
+    depends_on:
+      executor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - portal-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+
+  # Frontend React application
+  frontend:
+    build:
+      context: ../../packages/@portal/frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: python-portal-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+      - VITE_BACKEND_URL=https://python-portal-real.nf0keysv54fy8.eu-west-1.cs.amazonlightsail.com/api
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - portal-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+
+  # Nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: python-portal-nginx-prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - portal-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  portal-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  nginx-ssl:
+    driver: local

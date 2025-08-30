@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Python code executor service
+  executor:
+    build:
+      context: ../../packages/@portal/executor
+      dockerfile: Dockerfile
+      target: development
+    container_name: python-portal-executor-dev
+    restart: unless-stopped
+    ports:
+      - "3003:3000"
+    volumes:
+      - ../../packages/@portal/executor/src:/app/src:ro
+      - ../../packages/@portal/executor/dist:/app/dist
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - LOG_LEVEL=debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - portal-network
+    command: ["npm", "run", "dev"]
+
+  # Backend API service
+  backend:
+    build:
+      context: ../../packages/@portal/backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: python-portal-backend-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - ../../packages/@portal/backend/src:/app/src:ro
+      - ../../packages/@portal/backend/dist:/app/dist
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - FRONTEND_URL=http://localhost:5173
+      - EXECUTOR_SERVICE_URL=http://executor:3000
+      - LOG_LEVEL=debug
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+    depends_on:
+      executor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - portal-network
+    command: ["npm", "run", "dev"]
+
+  # Frontend React application (development mode with Vite)
+  frontend:
+    build:
+      context: ../../packages/@portal/frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: python-portal-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../../packages/@portal/frontend/src:/app/src:ro
+      - ../../packages/@portal/frontend/public:/app/public:ro
+      - ../../packages/@portal/frontend/index.html:/app/index.html:ro
+    environment:
+      - NODE_ENV=development
+      - VITE_BACKEND_URL=http://localhost:3001/api
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - portal-network
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+networks:
+  portal-network:
+    driver: bridge
+    name: python-portal-dev
+
+volumes:
+  node_modules_executor:
+  node_modules_backend:
+  node_modules_frontend:

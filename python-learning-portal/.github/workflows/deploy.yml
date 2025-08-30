@@ -1,0 +1,417 @@
+name: 'Deploy to AWS Lightsail'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'backend/**'
+      - 'frontend/**'
+      - 'infrastructure/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      force_deploy:
+        description: 'Force deployment (skip health checks)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '20'
+  AWS_REGION: 'eu-west-1'
+  CONTAINER_SERVICE_NAME: 'python-portal-containers'
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  # Job 1: Pre-deployment Validation
+  pre-deploy:
+    name: 'Pre-deployment Validation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+      deployment_env: ${{ steps.check.outputs.deployment_env }}
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 'Check Deployment Conditions'
+        id: check
+        run: |
+          SHOULD_DEPLOY="true"
+          DEPLOYMENT_ENV="${{ github.event.inputs.environment || 'production' }}"
+          
+          # Check if this is a forced deployment
+          if [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+            echo "🔄 Force deployment requested"
+            SHOULD_DEPLOY="true"
+          else
+            # Check if there are relevant changes
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+            if echo "$CHANGED_FILES" | grep -E "(packages|backend|frontend|infrastructure)" > /dev/null; then
+              echo "📦 Relevant changes detected, proceeding with deployment"
+              SHOULD_DEPLOY="true"
+            else
+              echo "ℹ️ No relevant changes detected, skipping deployment"
+              SHOULD_DEPLOY="false"
+            fi
+          fi
+          
+          echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+          echo "deployment_env=$DEPLOYMENT_ENV" >> $GITHUB_OUTPUT
+
+      - name: 'Validate AWS Credentials'
+        if: steps.check.outputs.should_deploy == 'true'
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "❌ AWS credentials not configured"
+            echo "Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets"
+            exit 1
+          else
+            echo "✅ AWS credentials configured"
+          fi
+
+  # Job 2: Build Production Images
+  build-production:
+    name: 'Build Production Images'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: pre-deploy
+    if: needs.pre-deploy.outputs.should_deploy == 'true'
+    
+    strategy:
+      matrix:
+        service: ['executor', 'backend', 'frontend']
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Set up Docker Buildx'
+        uses: docker/setup-buildx-action@v3
+
+      - name: 'Configure AWS Credentials'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 'Login to Amazon ECR Public'
+        id: login-ecr-public
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+
+      - name: 'Build and Push Image - ${{ matrix.service }}'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service == 'executor' && 'packages/@portal/executor' || matrix.service }}
+          file: ${{ matrix.service == 'executor' && 'packages/@portal/executor/Dockerfile' || format('{0}/Dockerfile', matrix.service) }}
+          push: true
+          tags: |
+            public.ecr.aws/python-portal/python-portal-${{ matrix.service }}:latest
+            public.ecr.aws/python-portal/python-portal-${{ matrix.service }}:${{ github.sha }}
+          target: production
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          build-args: |
+            NODE_ENV=production
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_SHA=${{ github.sha }}
+
+      - name: 'Verify Image'
+        run: |
+          docker pull public.ecr.aws/python-portal/python-portal-${{ matrix.service }}:${{ github.sha }}
+          docker run --rm --name verify-${{ matrix.service }} \
+            -d public.ecr.aws/python-portal/python-portal-${{ matrix.service }}:${{ github.sha }}
+          sleep 15
+          
+          # Health check based on service type
+          if [ "${{ matrix.service }}" = "frontend" ]; then
+            docker exec verify-${{ matrix.service }} curl -f http://localhost:80/health || exit 1
+          else
+            docker exec verify-${{ matrix.service }} curl -f http://localhost:3000/health || exit 1
+          fi
+          
+          docker stop verify-${{ matrix.service }}
+
+  # Job 3: Deploy Infrastructure
+  deploy-infrastructure:
+    name: 'Deploy Infrastructure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [pre-deploy, build-production]
+    if: needs.pre-deploy.outputs.should_deploy == 'true'
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Setup Terraform'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.0'
+
+      - name: 'Configure AWS Credentials'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 'Terraform Init'
+        working-directory: infrastructure/terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=python-portal-terraform-state" \
+            -backend-config="key=lightsail/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: 'Terraform Plan'
+        working-directory: infrastructure/terraform
+        run: |
+          terraform plan \
+            -var="aws_region=${{ env.AWS_REGION }}" \
+            -var="container_service_name=${{ env.CONTAINER_SERVICE_NAME }}" \
+            -out=tfplan
+
+      - name: 'Terraform Apply'
+        working-directory: infrastructure/terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: 'Get Container Service URL'
+        id: get-url
+        working-directory: infrastructure/terraform
+        run: |
+          URL=$(terraform output -raw container_service_url)
+          echo "service_url=$URL" >> $GITHUB_OUTPUT
+          echo "🌍 Container Service URL: $URL"
+
+  # Job 4: Deploy Application
+  deploy-application:
+    name: 'Deploy Application'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [pre-deploy, build-production, deploy-infrastructure]
+    if: needs.pre-deploy.outputs.should_deploy == 'true'
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Configure AWS Credentials'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 'Create Deployment Configuration'
+        run: |
+          cat > deployment-config.json << EOF
+          {
+            "serviceName": "${{ env.CONTAINER_SERVICE_NAME }}",
+            "containers": {
+              "nginx": {
+                "image": "nginx:alpine",
+                "ports": {
+                  "80": "HTTP"
+                },
+                "environment": {
+                  "NODE_ENV": "production"
+                }
+              },
+              "frontend": {
+                "image": "public.ecr.aws/python-portal/python-portal-frontend:${{ github.sha }}",
+                "environment": {
+                  "NODE_ENV": "production",
+                  "VITE_BACKEND_URL": "https://${{ needs.deploy-infrastructure.outputs.service_url }}/api"
+                }
+              },
+              "backend": {
+                "image": "public.ecr.aws/python-portal/python-portal-backend:${{ github.sha }}",
+                "environment": {
+                  "NODE_ENV": "production",
+                  "PORT": "3000",
+                  "FRONTEND_URL": "https://${{ needs.deploy-infrastructure.outputs.service_url }}",
+                  "EXECUTOR_SERVICE_URL": "http://localhost:3003"
+                }
+              },
+              "executor": {
+                "image": "public.ecr.aws/python-portal/python-portal-executor:${{ github.sha }}",
+                "environment": {
+                  "NODE_ENV": "production",
+                  "PORT": "3000"
+                }
+              }
+            },
+            "publicEndpoint": {
+              "containerName": "nginx",
+              "containerPort": 80,
+              "healthCheck": {
+                "path": "/health",
+                "intervalSeconds": 30,
+                "timeoutSeconds": 5,
+                "healthyThreshold": 2,
+                "unhealthyThreshold": 2,
+                "successCodes": "200"
+              }
+            }
+          }
+          EOF
+
+      - name: 'Deploy to Lightsail'
+        run: |
+          # Create deployment using AWS CLI
+          aws lightsail create-container-service-deployment \
+            --service-name ${{ env.CONTAINER_SERVICE_NAME }} \
+            --cli-input-json file://deployment-config.json \
+            --region ${{ env.AWS_REGION }}
+
+      - name: 'Wait for Deployment'
+        run: |
+          echo "⏳ Waiting for deployment to complete..."
+          
+          for i in {1..20}; do
+            STATUS=$(aws lightsail get-container-services \
+              --service-name ${{ env.CONTAINER_SERVICE_NAME }} \
+              --region ${{ env.AWS_REGION }} \
+              --query 'containerServices[0].state' \
+              --output text)
+            
+            echo "Deployment status: $STATUS (attempt $i/20)"
+            
+            if [ "$STATUS" = "RUNNING" ]; then
+              echo "✅ Deployment successful!"
+              break
+            elif [ "$STATUS" = "FAILED" ]; then
+              echo "❌ Deployment failed!"
+              exit 1
+            fi
+            
+            sleep 30
+          done
+
+  # Job 5: Post-deployment Validation
+  validate-deployment:
+    name: 'Validate Deployment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deploy-infrastructure, deploy-application]
+    if: needs.pre-deploy.outputs.should_deploy == 'true'
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 'Install Testing Dependencies'
+        run: |
+          npm install -g newman artillery
+
+      - name: 'Health Check'
+        run: |
+          SERVICE_URL="${{ needs.deploy-infrastructure.outputs.service_url }}"
+          echo "🔍 Validating deployment at: $SERVICE_URL"
+          
+          # Wait for service to be ready
+          timeout 300 bash -c "
+            until curl -f https://$SERVICE_URL/health; do
+              echo 'Waiting for application to be ready...'
+              sleep 10
+            done
+          "
+
+      - name: 'API Validation'
+        run: |
+          SERVICE_URL="${{ needs.deploy-infrastructure.outputs.service_url }}"
+          
+          # Test API endpoints
+          curl -f "https://$SERVICE_URL/api/health" || exit 1
+          curl -f "https://$SERVICE_URL/api/exercises" || exit 1
+          
+          echo "✅ API validation successful"
+
+      - name: 'Frontend Validation'
+        run: |
+          SERVICE_URL="${{ needs.deploy-infrastructure.outputs.service_url }}"
+          
+          # Test frontend loading
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "https://$SERVICE_URL")
+          if [ "$RESPONSE" -eq 200 ]; then
+            echo "✅ Frontend validation successful"
+          else
+            echo "❌ Frontend validation failed (HTTP $RESPONSE)"
+            exit 1
+          fi
+
+      - name: 'Performance Smoke Test'
+        run: |
+          SERVICE_URL="${{ needs.deploy-infrastructure.outputs.service_url }}"
+          
+          # Quick performance test
+          artillery quick --count 3 --num 10 "https://$SERVICE_URL/api/health"
+          
+          echo "✅ Performance smoke test completed"
+
+  # Job 6: Deployment Summary
+  deployment-summary:
+    name: 'Deployment Summary'
+    runs-on: ubuntu-latest
+    needs: [pre-deploy, build-production, deploy-infrastructure, deploy-application, validate-deployment]
+    if: always() && needs.pre-deploy.outputs.should_deploy == 'true'
+    
+    steps:
+      - name: 'Generate Deployment Report'
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.pre-deploy.outputs.deployment_env }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-deployment | ${{ needs.pre-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Production | ${{ needs.build-production.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy Infrastructure | ${{ needs.deploy-infrastructure.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy Application | ${{ needs.deploy-application.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Validation | ${{ needs.validate-deployment.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.validate-deployment.result }}" = "success" ]; then
+            echo "✅ **Deployment Successful!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🌍 **Application URL:** https://${{ needs.deploy-infrastructure.outputs.service_url }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Deployment Failed!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the logs for error details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 'Notify Deployment Status'
+        if: failure()
+        run: |
+          echo "❌ Deployment failed - please check the workflow logs"
+          exit 1

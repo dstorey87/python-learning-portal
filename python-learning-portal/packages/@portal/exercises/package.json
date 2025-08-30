@@ -1,0 +1,38 @@
+{
+  "name": "@portal/exercises",
+  "version": "1.0.0",
+  "description": "Exercise content package for Python Learning Portal",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "lint": "eslint src --ext .ts",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "@portal/types": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "python",
+    "exercises",
+    "learning",
+    "content",
+    "education"
+  ],
+  "author": "Python Learning Portal",
+  "license": "MIT",
+  "files": [
+    "dist/",
+    "content/",
+    "README.md"
+  ]
+}

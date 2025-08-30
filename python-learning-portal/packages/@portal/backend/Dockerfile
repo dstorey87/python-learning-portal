@@ -1,0 +1,34 @@
+# Backend Service Dockerfile
+# Production-ready Node.js container for @portal/backend
+
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application
+COPY dist/ ./dist/
+COPY data/ ./data/
+
+# Create necessary directories
+RUN mkdir -p temp logs
+
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=3050
+
+# Expose backend port
+EXPOSE 3050
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "const http = require('http'); http.get('http://localhost:3050/health', (res) => { res.statusCode === 200 ? process.exit(0) : process.exit(1) }).on('error', () => process.exit(1))"
+
+# Run the application
+CMD ["node", "dist/index.js"]

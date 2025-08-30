@@ -1,0 +1,413 @@
+name: 'Pull Request Validation'
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Job 1: PR Information
+  pr-info:
+    name: 'PR Information'
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: 'PR Details'
+        run: |
+          echo "## 📋 Pull Request Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Title:** ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Author:** @${{ github.event.pull_request.user.login }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.event.pull_request.head.ref }} → ${{ github.event.pull_request.base.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commits:** ${{ github.event.pull_request.commits }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Changed Files:** ${{ github.event.pull_request.changed_files }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # Job 2: Code Quality Checks
+  code-quality:
+    name: 'Code Quality'
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    timeout-minutes: 10
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: |
+          npm ci
+          npm run install:all
+
+      - name: 'Run ESLint'
+        run: |
+          npm run lint -- --format json --output-file eslint-report.json || true
+          npm run lint
+
+      - name: 'Run Prettier Check'
+        run: npx prettier --check "**/*.{ts,tsx,js,jsx,json,md}"
+
+      - name: 'TypeScript Check'
+        run: npm run type-check
+
+      - name: 'Check for TODO/FIXME Comments'
+        run: |
+          TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" . | wc -l)
+          echo "Found $TODO_COUNT TODO/FIXME comments"
+          
+          if [ $TODO_COUNT -gt 10 ]; then
+            echo "⚠️ Warning: High number of TODO/FIXME comments ($TODO_COUNT)"
+            echo "Consider addressing some before merging"
+          fi
+
+      - name: 'Code Complexity Check'
+        run: |
+          npx eslint . --format json > complexity-report.json || true
+          # Add complexity analysis logic here
+
+  # Job 3: Changed Files Analysis
+  changed-files:
+    name: 'Changed Files Analysis'
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    outputs:
+      has_backend_changes: ${{ steps.changes.outputs.backend }}
+      has_frontend_changes: ${{ steps.changes.outputs.frontend }}
+      has_executor_changes: ${{ steps.changes.outputs.executor }}
+      has_types_changes: ${{ steps.changes.outputs.types }}
+      has_infrastructure_changes: ${{ steps.changes.outputs.infrastructure }}
+      has_docs_changes: ${{ steps.changes.outputs.docs }}
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Detect Changes'
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            executor:
+              - 'packages/@portal/executor/**'
+            types:
+              - 'packages/@portal/types/**'
+            infrastructure:
+              - 'infrastructure/**'
+              - '.github/workflows/**'
+            docs:
+              - '*.md'
+              - 'docs/**'
+
+      - name: 'Changes Summary'
+        run: |
+          echo "## 📁 Changed Components" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Changed |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | ${{ steps.changes.outputs.backend == 'true' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ steps.changes.outputs.frontend == 'true' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Executor | ${{ steps.changes.outputs.executor == 'true' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Types | ${{ steps.changes.outputs.types == 'true' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure | ${{ steps.changes.outputs.infrastructure == 'true' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Documentation | ${{ steps.changes.outputs.docs == 'true' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+
+  # Job 4: Targeted Testing
+  targeted-tests:
+    name: 'Targeted Tests'
+    runs-on: ubuntu-latest
+    needs: changed-files
+    if: github.event.pull_request.draft == false
+    timeout-minutes: 15
+    
+    strategy:
+      matrix:
+        component: ['backend', 'frontend', 'executor', 'types']
+    
+    steps:
+      - name: 'Skip if no changes'
+        id: should-run
+        run: |
+          SHOULD_RUN="false"
+          case "${{ matrix.component }}" in
+            "backend")
+              if [ "${{ needs.changed-files.outputs.has_backend_changes }}" = "true" ] || [ "${{ needs.changed-files.outputs.has_types_changes }}" = "true" ]; then
+                SHOULD_RUN="true"
+              fi
+              ;;
+            "frontend")
+              if [ "${{ needs.changed-files.outputs.has_frontend_changes }}" = "true" ] || [ "${{ needs.changed-files.outputs.has_types_changes }}" = "true" ]; then
+                SHOULD_RUN="true"
+              fi
+              ;;
+            "executor")
+              if [ "${{ needs.changed-files.outputs.has_executor_changes }}" = "true" ] || [ "${{ needs.changed-files.outputs.has_types_changes }}" = "true" ]; then
+                SHOULD_RUN="true"
+              fi
+              ;;
+            "types")
+              if [ "${{ needs.changed-files.outputs.has_types_changes }}" = "true" ]; then
+                SHOULD_RUN="true"
+              fi
+              ;;
+          esac
+          echo "should_run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+
+      - name: 'Checkout Repository'
+        if: steps.should-run.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+
+      - name: 'Setup Node.js'
+        if: steps.should-run.outputs.should_run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 'Setup Python'
+        if: steps.should-run.outputs.should_run == 'true' && matrix.component == 'executor'
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 'Install Dependencies'
+        if: steps.should-run.outputs.should_run == 'true'
+        run: |
+          npm ci
+          npm run install:all
+
+      - name: 'Build Component'
+        if: steps.should-run.outputs.should_run == 'true'
+        run: npm run build:${{ matrix.component }}
+
+      - name: 'Test Component'
+        if: steps.should-run.outputs.should_run == 'true'
+        run: npm run test:${{ matrix.component }} -- --coverage
+
+      - name: 'Upload Coverage'
+        if: steps.should-run.outputs.should_run == 'true'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: ${{ matrix.component }}
+          name: ${{ matrix.component }}-coverage
+
+  # Job 5: Security Checks
+  security-checks:
+    name: 'Security Checks'
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    timeout-minutes: 10
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: npm ci
+
+      - name: 'Audit Dependencies'
+        run: |
+          npm audit --audit-level=moderate
+          npx audit-ci --config .audit-ci.json || true
+
+      - name: 'Secret Scan'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+
+      - name: 'License Check'
+        run: |
+          npx license-checker --summary --excludePrivatePackages
+
+  # Job 6: Docker Build Test
+  docker-build-test:
+    name: 'Docker Build Test'
+    runs-on: ubuntu-latest
+    needs: changed-files
+    if: |
+      github.event.pull_request.draft == false &&
+      (needs.changed-files.outputs.has_backend_changes == 'true' ||
+       needs.changed-files.outputs.has_frontend_changes == 'true' ||
+       needs.changed-files.outputs.has_executor_changes == 'true' ||
+       needs.changed-files.outputs.has_infrastructure_changes == 'true')
+    timeout-minutes: 20
+    
+    strategy:
+      matrix:
+        service: ['executor', 'backend', 'frontend']
+    
+    steps:
+      - name: 'Skip if no relevant changes'
+        id: should-build
+        run: |
+          SHOULD_BUILD="false"
+          case "${{ matrix.service }}" in
+            "backend")
+              if [ "${{ needs.changed-files.outputs.has_backend_changes }}" = "true" ] || [ "${{ needs.changed-files.outputs.has_infrastructure_changes }}" = "true" ]; then
+                SHOULD_BUILD="true"
+              fi
+              ;;
+            "frontend")
+              if [ "${{ needs.changed-files.outputs.has_frontend_changes }}" = "true" ] || [ "${{ needs.changed-files.outputs.has_infrastructure_changes }}" = "true" ]; then
+                SHOULD_BUILD="true"
+              fi
+              ;;
+            "executor")
+              if [ "${{ needs.changed-files.outputs.has_executor_changes }}" = "true" ] || [ "${{ needs.changed-files.outputs.has_infrastructure_changes }}" = "true" ]; then
+                SHOULD_BUILD="true"
+              fi
+              ;;
+          esac
+          echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+
+      - name: 'Checkout Repository'
+        if: steps.should-build.outputs.should_build == 'true'
+        uses: actions/checkout@v4
+
+      - name: 'Set up Docker Buildx'
+        if: steps.should-build.outputs.should_build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: 'Build Docker Image'
+        if: steps.should-build.outputs.should_build == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service == 'executor' && 'packages/@portal/executor' || matrix.service }}
+          file: ${{ matrix.service == 'executor' && 'packages/@portal/executor/Dockerfile' || format('{0}/Dockerfile', matrix.service) }}
+          push: false
+          tags: python-portal-${{ matrix.service }}:pr-${{ github.event.number }}
+          target: production
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Job 7: Integration Test (if significant changes)
+  integration-test:
+    name: 'Integration Test'
+    runs-on: ubuntu-latest
+    needs: [changed-files, targeted-tests, docker-build-test]
+    if: |
+      github.event.pull_request.draft == false &&
+      (needs.changed-files.outputs.has_backend_changes == 'true' ||
+       needs.changed-files.outputs.has_frontend_changes == 'true' ||
+       needs.changed-files.outputs.has_executor_changes == 'true')
+    timeout-minutes: 20
+    
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: |
+          npm ci
+          npm run install:all
+
+      - name: 'Start Development Environment'
+        run: |
+          cd infrastructure
+          chmod +x deploy.sh
+          ./deploy.sh dev
+        env:
+          NODE_ENV: test
+
+      - name: 'Wait for Services'
+        run: |
+          timeout 120 bash -c '
+            until curl -f http://localhost:3003/health; do
+              echo "Waiting for executor service..."
+              sleep 5
+            done
+            until curl -f http://localhost:3001/health; do
+              echo "Waiting for backend service..."
+              sleep 5
+            done
+          '
+
+      - name: 'Run Integration Tests'
+        run: npm run test:integration
+
+      - name: 'Stop Services'
+        if: always()
+        run: |
+          cd infrastructure
+          ./deploy.sh stop
+
+  # Job 8: PR Summary
+  pr-summary:
+    name: 'PR Summary'
+    runs-on: ubuntu-latest
+    needs: [pr-info, code-quality, changed-files, targeted-tests, security-checks]
+    if: always() && github.event.pull_request.draft == false
+    
+    steps:
+      - name: 'Generate PR Summary'
+        run: |
+          echo "## 📊 Pull Request Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Quality | ${{ needs.code-quality.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Targeted Tests | ${{ needs.targeted-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Checks | ${{ needs.security-checks.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          if [ "${{ needs.code-quality.result }}" = "success" ] && 
+             [ "${{ needs.targeted-tests.result }}" = "success" ] && 
+             [ "${{ needs.security-checks.result }}" = "success" ]; then
+            echo "### ✅ All Checks Passed!" >> $GITHUB_STEP_SUMMARY
+            echo "This pull request is ready for review." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Some Checks Failed" >> $GITHUB_STEP_SUMMARY
+            echo "Please address the failing checks before requesting review." >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Changed Components:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: ${{ needs.changed-files.outputs.has_backend_changes == 'true' && '✅' || '➖' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: ${{ needs.changed-files.outputs.has_frontend_changes == 'true' && '✅' || '➖' }}" >> $GITHUB_STEP_SUMMARY  
+          echo "- Executor: ${{ needs.changed-files.outputs.has_executor_changes == 'true' && '✅' || '➖' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Types: ${{ needs.changed-files.outputs.has_types_changes == 'true' && '✅' || '➖' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Infrastructure: ${{ needs.changed-files.outputs.has_infrastructure_changes == 'true' && '✅' || '➖' }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: 'Set Final Status'
+        run: |
+          if [ "${{ needs.code-quality.result }}" != "success" ] || 
+             [ "${{ needs.targeted-tests.result }}" != "success" ] || 
+             [ "${{ needs.security-checks.result }}" != "success" ]; then
+            echo "❌ PR validation failed"
+            exit 1
+          else
+            echo "✅ PR validation passed"
+          fi

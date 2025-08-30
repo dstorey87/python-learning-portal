@@ -1,4 +1,66 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "files.associations": {
+        "*.md": "markdown",
+        "RESTRUCTURING_PLAN.md": "markdown",
+        "copilot-instructions.md": "markdown"
+    },
+    "github.copilot.enable": {
+        "*": true
+    },
+    "github.copilot.advanced": {
+        "projectContext": [
+            ".github/copilot-instructions.md",
+            ".copilot/instructions.md",
+            "RESTRUCTURING_PLAN.md"
+        ]
+    },
+    "workbench.startupEditor": "readme",
+    "recommendations": [
+        "github.copilot",
+        "github.copilot-chat",
+        "ms-playwright.playwright"
+    ],
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true
+    },
+    "typescript.preferences.importModuleSpecifier": "non-relative",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "eslint.workingDirectories": [
+        "./packages/frontend",
+        "./packages/backend",
+        "./packages/types",
+        "./python-learning-portal"
+    ],
+    "npm.packageManager": "npm",
+    "files.readonlyInclude": {
+        "**/.github/copilot-instructions.md": true,
+        "**/RESTRUCTURING_PLAN.md": true
+    },
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "vscode.typescript-language-features",
+    "[typescript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "[typescriptreact]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "playwright.reuseBrowser": true,
+    "playwright.showTrace": true,
+    "errorLens.enabled": true,
+    "errorLens.enabledDiagnosticLevels": ["error", "warning"],
+    "terminal.integrated.env.windows": {
+        "AWS_REGION": "eu-west-1",
+        "NODE_ENV": "development"
+    },
+    "aws.telemetry": false,
+    "aws.suppressPrompts": {
+        "regionAddAutomatically": true
+    }
 }

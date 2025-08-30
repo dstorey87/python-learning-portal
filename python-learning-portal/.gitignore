@@ -137,10 +137,41 @@ backend/uploads/
 
 # Frontend specific
 frontend/.vite/
-# Test artifacts and reports (should never be committed)
+# Test artifacts and reports
 playwright-report/
 test-results/
 .playwright-mcp/
+coverage/
+*.lcov
+.nyc_output
+junit.xml
+test-report.xml
+eslint-report.json
+complexity-report.json
+
+# CI/CD artifacts
+release-notes.md
+CHANGELOG_ENTRY.md
+CHANGELOG_NEW.md
+release-assets/
+*.tar.gz
+
+# GitHub Actions
+.github-actions-cache/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Terraform
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/.terraform/
+infrastructure/terraform/.terraform.lock.hcl
+infrastructure/terraform/terraform.tfvars
+
+# AWS
+.aws/
 
 # Development test files
 *-test.html
