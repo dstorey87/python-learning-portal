@@ -11,6 +11,7 @@ import { exerciseRoutes } from './routes/exercises';
 import { userRoutes } from './routes/users';
 import { executionRoutes } from './routes/execution';
 import { progressRoutes } from './routes/progress';
+import { authRoutes } from './routes/auth';
 
 const app = express();
 const DEFAULT_PORT = 3050;  // Use our dedicated backend port range 3050-3060
@@ -144,6 +145,7 @@ app.get('/health/live', (req, res) => {
 });
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/exercises', exerciseRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/execution', executionLimiter, executionRoutes);

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getDatabase } from '../database/init';
-import { Exercise, APIResponse, AppError } from '@portal/types';
+import { Exercise, APIResponse, AppError } from '../types';
 
 const router = Router();
 
@@ -8,7 +8,7 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     const db = getDatabase();
-    
+
     const exercises = await db.all(`
       SELECT 
         id, title, description, instructions, starter_code, test_code, solution_code,
@@ -48,7 +48,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const db = getDatabase();
-    
+
     const exercise = await db.get(`
       SELECT 
         id, title, description, instructions, starter_code, test_code, solution_code,
@@ -92,7 +92,7 @@ router.get('/:id/hints', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const db = getDatabase();
-    
+
     const hints = await db.all(`
       SELECT id, title, content, order_index, reveal_level
       FROM hints 

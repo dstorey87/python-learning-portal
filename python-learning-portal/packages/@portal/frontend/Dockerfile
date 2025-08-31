@@ -1,7 +1,7 @@
 # Frontend Service Dockerfile  
 # Production-ready Nginx container for @portal/frontend
 
-FROM node:20-alpine as build-stage
+FROM node:20-alpine AS build
 
 # Set working directory
 WORKDIR /app
@@ -25,13 +25,13 @@ COPY postcss.config.cjs ./
 RUN npm run build
 
 # Production stage with Nginx
-FROM nginx:alpine as production-stage
+FROM nginx:alpine AS production
 
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy built assets from build stage
-COPY --from=build-stage /app/dist /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
@@ -47,11 +47,11 @@ RUN chown -R nextjs:nodejs /var/run
 USER nextjs
 
 # Expose frontend port
-EXPOSE 3010
+EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3010/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
 
 # Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

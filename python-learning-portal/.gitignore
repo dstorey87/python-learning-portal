@@ -15,6 +15,13 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.auth
+.env.production
+
+# AWS credentials and deployment files
+*deployment.json
+container-deployment.json
+lightsail-deployment.json
 
 # Logs
 *.log

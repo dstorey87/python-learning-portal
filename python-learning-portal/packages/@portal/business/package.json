@@ -1,0 +1,38 @@
+{
+  "name": "@portal/business",
+  "version": "1.0.0",
+  "description": "Centralized business logic and rules engine for Python Learning Portal",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "demo": "npx ts-node DEMO_Paywalling.ts",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix"
+  },
+  "dependencies": {
+    "@portal/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  },
+  "keywords": [
+    "business-logic",
+    "rules-engine",
+    "user-management",
+    "access-control",
+    "payments",
+    "analytics"
+  ],
+  "author": "Python Learning Portal Team",
+  "license": "MIT"
+}

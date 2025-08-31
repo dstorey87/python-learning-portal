@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs/promises';
-import { CodeExecution, CodeExecutionResult, TestResult, APIResponse, AppError } from '@portal/types';
+import { CodeExecution, CodeExecutionResult, TestResult, APIResponse, AppError } from '../types';
 
 const router = Router();
 const PYTHON_TIMEOUT = 3000; // Reduced to 3 seconds for much faster feedback
@@ -28,7 +28,7 @@ router.post('/run', async (req: Request, res: Response) => {
     }
 
     const result = await executeCode(code, exerciseId, runTests);
-    
+
     const response: APIResponse<CodeExecutionResult> = {
       success: true,
       data: result
@@ -42,12 +42,12 @@ router.post('/run', async (req: Request, res: Response) => {
 });
 
 async function executeCode(
-  userCode: string, 
-  exerciseId?: string, 
+  userCode: string,
+  exerciseId?: string,
   runTests: boolean = false
 ): Promise<CodeExecutionResult> {
   const startTime = Date.now();
-  
+
   try {
     // Create temporary directory
     const tempDir = path.join(__dirname, '../../temp', uuidv4());
@@ -61,7 +61,7 @@ async function executeCode(
         /if\s+__name__\s*==\s*['""]__main__['""]:\s*\n((?:\s{4,}.*\n?)*)/gm,
         '# Interactive section removed for web execution\n# $&'
       );
-      
+
       // Also handle cases where there's no proper indentation
       processedCode = processedCode.replace(
         /if\s+__name__\s*==\s*['""]__main__['""]:\s*(.*)/g,
@@ -134,7 +134,7 @@ async function runCodeOnly(codeFile: string): Promise<CodeExecutionResult> {
     pythonProcess.stdout?.on('data', (data) => {
       const chunk = data.toString('utf-8');
       outputSize += chunk.length;
-      
+
       if (outputSize > MAX_OUTPUT_SIZE) {
         pythonProcess.kill('SIGTERM');
         const executionTime = Date.now() - startTime;
@@ -146,7 +146,7 @@ async function runCodeOnly(codeFile: string): Promise<CodeExecutionResult> {
         });
         return;
       }
-      
+
       outputChunks.push(chunk);
     });
 
@@ -158,11 +158,11 @@ async function runCodeOnly(codeFile: string): Promise<CodeExecutionResult> {
       const executionTime = Date.now() - startTime;
       output = outputChunks.join('').trim();
       errors = errorChunks.join('').trim();
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.log(`� Execution completed in ${executionTime}ms (exit code: ${code})`);
       }
-      
+
       resolve({
         success: code === 0,
         output: output,
@@ -173,14 +173,14 @@ async function runCodeOnly(codeFile: string): Promise<CodeExecutionResult> {
 
     pythonProcess.on('error', (error) => {
       const executionTime = Date.now() - startTime;
-      
+
       if (error.message.includes('ENOENT')) {
         resolve({
           success: false,
           output: '',
           errors: `Python not found. Please install Python and ensure it's in your PATH.\n` +
-                 `Windows users: Install from python.org\n` +
-                 `Linux/Mac users: Use your system package manager`,
+            `Windows users: Install from python.org\n` +
+            `Linux/Mac users: Use your system package manager`,
           executionTime
         });
       } else {
@@ -200,11 +200,11 @@ async function runCodeOnly(codeFile: string): Promise<CodeExecutionResult> {
         resolve({
           success: false,
           output: outputChunks.join('').trim(),
-          errors: `⏱️ Code execution timed out after ${PYTHON_TIMEOUT/1000}s.\n` +
-                 `This usually means:\n` +
-                 `• Your code has an infinite loop\n` +
-                 `• You're using input() which waits for user input\n` +
-                 `• The code is taking too long to execute`,
+          errors: `⏱️ Code execution timed out after ${PYTHON_TIMEOUT / 1000}s.\n` +
+            `This usually means:\n` +
+            `• Your code has an infinite loop\n` +
+            `• You're using input() which waits for user input\n` +
+            `• The code is taking too long to execute`,
           executionTime: PYTHON_TIMEOUT
         });
       }
@@ -213,17 +213,17 @@ async function runCodeOnly(codeFile: string): Promise<CodeExecutionResult> {
 }
 
 async function runCodeWithTests(
-  userCode: string, 
-  exerciseId: string, 
+  userCode: string,
+  exerciseId: string,
   tempDir: string
 ): Promise<CodeExecutionResult> {
   try {
     // Get test code from database
     const { getDatabase } = await import('../database/init');
     const db = getDatabase();
-    
+
     const exercise = await db.get(
-      'SELECT test_code FROM exercises WHERE id = ?', 
+      'SELECT test_code FROM exercises WHERE id = ?',
       [exerciseId]
     );
 
@@ -255,15 +255,15 @@ ${exercise.test_code}
     await fs.writeFile(testFile, testCode);
 
     const result = await runCodeOnly(testFile);
-    
+
     // Parse test results
     const testResult = parseTestOutput(result.output, result.errors);
-    
+
     return {
       success: result.success && testResult.passed,
       output: result.output,
       errors: result.errors,
-      testResult,
+      testResults: [testResult],
       executionTime: 0
     };
 
@@ -275,16 +275,17 @@ ${exercise.test_code}
 function parseTestOutput(output: string, errors?: string): TestResult {
   const testResult: TestResult = {
     passed: false,
+    message: errors || 'Test execution completed',
     output,
     errors,
-    executionTime: 0,
     testCases: []
   };
 
   if (errors && errors.includes('IMPORT_ERROR')) {
-    testResult.testCases.push({
+    testResult.testCases?.push({
       name: 'Import Test',
       passed: false,
+      message: 'Failed to import your code. Check for syntax errors.',
       error: 'Failed to import your code. Check for syntax errors.'
     });
     return testResult;
@@ -293,57 +294,71 @@ function parseTestOutput(output: string, errors?: string): TestResult {
   // Enhanced test result parsing
   if (output.includes('OK') && !errors) {
     testResult.passed = true;
-    testResult.testCases.push({
+    testResult.message = 'All tests passed successfully';
+    testResult.testCases?.push({
       name: 'All Tests',
-      passed: true
+      passed: true,
+      message: 'All tests passed successfully'
     });
   } else if (errors) {
     // Better error parsing for common Python errors
     const cleanedErrors = errors.replace(/^\s*File ".*?", line \d+, in .*?\n/gm, '')
-                                .replace(/^\s*$/gm, '')
-                                .trim();
-    
+      .replace(/^\s*$/gm, '')
+      .trim();
+
     if (errors.includes('AssertionError:')) {
       const lines = errors.split('\n');
       for (const line of lines) {
         if (line.includes('AssertionError:')) {
-          testResult.testCases.push({
+          const errorMsg = line.replace('AssertionError: ', '').trim();
+          testResult.testCases?.push({
             name: 'Test Case',
             passed: false,
-            error: line.replace('AssertionError: ', '').trim()
+            message: errorMsg,
+            error: errorMsg
           });
         }
       }
     } else if (errors.includes('SyntaxError:')) {
-      testResult.testCases.push({
+      const errorMsg = 'Syntax error in your code. Please check for typos, missing colons, or incorrect indentation.';
+      testResult.testCases?.push({
         name: 'Syntax Check',
         passed: false,
-        error: 'Syntax error in your code. Please check for typos, missing colons, or incorrect indentation.'
+        message: errorMsg,
+        error: errorMsg
       });
     } else if (errors.includes('NameError:')) {
-      testResult.testCases.push({
+      const errorMsg = 'Variable or function name not found. Check your spelling and make sure you defined it.';
+      testResult.testCases?.push({
         name: 'Variable Check',
         passed: false,
-        error: 'Variable or function name not found. Check your spelling and make sure you defined it.'
+        message: errorMsg,
+        error: errorMsg
       });
     } else if (errors.includes('IndentationError:')) {
-      testResult.testCases.push({
+      const errorMsg = 'Indentation error. Python requires consistent indentation (use 4 spaces).';
+      testResult.testCases?.push({
         name: 'Indentation Check',
         passed: false,
-        error: 'Indentation error. Python requires consistent indentation (use 4 spaces).'
+        message: errorMsg,
+        error: errorMsg
       });
     } else {
-      testResult.testCases.push({
+      const errorMsg = cleanedErrors || 'Unknown test failure';
+      testResult.testCases?.push({
         name: 'Execution',
         passed: false,
-        error: cleanedErrors || 'Unknown test failure'
+        message: errorMsg,
+        error: errorMsg
       });
     }
   } else {
-    testResult.testCases.push({
+    const errorMsg = 'No output from tests. Check your function implementation.';
+    testResult.testCases?.push({
       name: 'Execution',
       passed: false,
-      error: 'No output from tests. Check your function implementation.'
+      message: errorMsg,
+      error: errorMsg
     });
   }
 

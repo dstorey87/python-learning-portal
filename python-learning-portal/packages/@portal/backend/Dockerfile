@@ -1,7 +1,7 @@
 # Backend Service Dockerfile
 # Production-ready Node.js container for @portal/backend
 
-FROM node:20-alpine
+FROM node:20-alpine AS production
 
 # Set working directory
 WORKDIR /app
@@ -9,15 +9,18 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install all dependencies including dev dependencies for building
+RUN npm install --legacy-peer-deps && npm cache clean --force
 
-# Copy built application
-COPY dist/ ./dist/
-COPY data/ ./data/
+# Copy source code
+COPY src/ ./src/
+COPY tsconfig.json ./
+
+# Build the application inside Docker
+RUN npm run build
 
 # Create necessary directories
-RUN mkdir -p temp logs
+RUN mkdir -p temp logs dist data
 
 # Set production environment
 ENV NODE_ENV=production

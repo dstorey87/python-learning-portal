@@ -13,20 +13,47 @@ A modern, interactive web application for learning Python programming with a bea
 - 🔒 **Secure Execution**: Safe Python code execution environment
 - 🧪 **Full Test Coverage**: Comprehensive testing with Playwright
 
+## 🏗️ Architecture
+
+This project uses a **loosely coupled package architecture** for maintainability and scalability:
+
+```
+packages/
+├── @portal/types/        # Shared TypeScript type definitions
+├── @portal/backend/      # Express.js API server
+├── @portal/frontend/     # React application with Vite
+├── @portal/exercises/    # Exercise content and solutions
+└── @portal/executor/     # Python execution microservice
+```
+
 ## Tech Stack
 
-### Frontend
+### Frontend (`@portal/frontend`)
 - React 18 + TypeScript
 - Vite for fast development
 - TailwindCSS for styling
 - Monaco Editor (VS Code editor)
 - React Query for state management
 
-### Backend
+### Backend (`@portal/backend`)
 - Node.js + Express + TypeScript
 - SQLite database for progress tracking
-- Secure Python subprocess execution
 - RESTful API design
+
+### Python Execution (`@portal/executor`)
+- Secure Python subprocess execution
+- Independent microservice architecture
+- Docker containerization support
+
+### Exercise Content (`@portal/exercises`)
+- Modular exercise definitions
+- Solution management system
+- Content parsing and validation
+
+### Type System (`@portal/types`)
+- Centralized TypeScript definitions
+- Shared types across all packages
+- Type safety enforcement
 
 ### Testing
 - Playwright for E2E testing

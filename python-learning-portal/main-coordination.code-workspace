@@ -1,0 +1,109 @@
+{
+  "folders": [
+    {
+      "name": "Python Learning Portal - Main Coordination",
+      "path": "."
+    },
+    {
+      "name": "Core Module",
+      "path": "./modules/core"
+    },
+    {
+      "name": "Exercises Module", 
+      "path": "./modules/exercises"
+    },
+    {
+      "name": "Legacy Packages",
+      "path": "./packages"
+    }
+  ],
+  "settings": {
+    "typescript.preferences.includePackageJsonAutoImports": "on",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/.git": false,
+      "**/temp": true,
+      "**/test-results": true,
+      "**/playwright-report": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/temp": true,
+      "**/test-results": true,
+      "**/playwright-report": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.vscode-typescript-next",
+      "ms-python.python",
+      "github.copilot",
+      "ms-playwright.playwright",
+      "bradlc.vscode-tailwindcss"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build All Modules",
+        "type": "shell",
+        "command": "npm run build:modules",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "problemMatcher": ["$tsc"]
+      },
+      {
+        "label": "Start Development Server",
+        "type": "shell",
+        "command": "npm run dev",
+        "group": "build",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "isBackground": true
+      },
+      {
+        "label": "Run Integration Tests",
+        "type": "shell",
+        "command": "npm run test:integration",
+        "group": "test",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        }
+      },
+      {
+        "label": "Deploy to Production",
+        "type": "shell",
+        "command": "npm run deploy",
+        "group": "build",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        }
+      }
+    ]
+  }
+}

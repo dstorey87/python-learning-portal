@@ -28,7 +28,7 @@ export const Header = () => {
                   </h1>
                   <div className="flex items-center space-x-1 text-xs text-gray-400">
                     <Zap className="h-3 w-3" />
-                    <span>Interactive Python Learning</span>
+                    <span>Interactive Python Learning - Frontend Package Updated!</span>
                   </div>
                 </div>
               </div>

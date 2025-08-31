@@ -1,0 +1,95 @@
+services:
+  # PocketBase Authentication Backend
+  pocketbase:
+    image: spectado/pocketbase:latest
+    container_name: python-portal-pocketbase
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - pocketbase_data:/pb_data
+      - ./infrastructure/docker/pocketbase/pb_migrations:/pb_migrations
+    environment:
+      - POCKETBASE_ENCRYPTION_KEY=${POCKETBASE_ENCRYPTION_KEY:-}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - portal-network
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./packages/@portal/backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: python-portal-backend
+    restart: unless-stopped
+    ports:
+      - "3050:3050"
+    environment:
+      - NODE_ENV=production
+      - PORT=3050
+      - POCKETBASE_URL=http://pocketbase:80
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://python-portal-real.nf0keysv54fy8.eu-west-1.cs.amazonlightsail.com}
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    volumes:
+      - ./data/temp:/app/temp
+      - ./data/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3050/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - portal-network
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./packages/@portal/frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: python-portal-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=http://backend:3050
+      - VITE_POCKETBASE_URL=http://pocketbase:80
+    depends_on:
+      backend:
+        condition: service_healthy
+      pocketbase:
+        condition: service_healthy
+    volumes:
+      - ./infrastructure/docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infrastructure/docker/nginx/ssl:/etc/nginx/ssl:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - portal-network
+
+networks:
+  portal-network:
+    driver: bridge
+    name: python-portal-network
+
+volumes:
+  pocketbase_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/pocketbase

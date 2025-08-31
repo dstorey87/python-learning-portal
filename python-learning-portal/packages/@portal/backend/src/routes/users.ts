@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { getDatabase } from '../database/init';
 import { v4 as uuidv4 } from 'uuid';
-import { APIResponse, User, AppError } from '@portal/types';
+import { APIResponse, AppError } from '../types';
+import { User } from '@portal/types';
 
 const router = Router();
 
@@ -10,7 +11,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const db = getDatabase();
-    
+
     const user = await db.get(`
       SELECT id, username, email, created_at
       FROM users 
@@ -82,7 +83,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const db = getDatabase();
-    
+
     // Check if user already exists
     const user = await db.get(
       'SELECT id, username, email, created_at FROM users WHERE username = ?',

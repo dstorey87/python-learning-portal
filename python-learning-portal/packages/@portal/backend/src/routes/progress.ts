@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDatabase } from '../database/init';
 import { v4 as uuidv4 } from 'uuid';
-import { APIResponse, UserProgress, AppError } from '@portal/types';
+import { APIResponse, UserProgress, AppError } from '../types';
 
 const router = Router();
 
@@ -9,9 +9,9 @@ const router = Router();
 router.get('/:userId/:exerciseId', async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, exerciseId } = req.params;
-    
+
     const db = getDatabase();
-    
+
     const progressData = await db.get(`
       SELECT 
         exercise_id, completed, attempts, best_solution,
@@ -63,7 +63,7 @@ router.get('/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const db = getDatabase();
-    
+
     const progressData = await db.all(`
       SELECT 
         id, exercise_id, completed, attempts, best_solution,
@@ -100,9 +100,9 @@ router.post('/:userId/:exerciseId', async (req: Request, res: Response) => {
   try {
     const { userId, exerciseId } = req.params;
     const { completed, solution, timeSpent = 0 } = req.body;
-    
+
     const db = getDatabase();
-    
+
     // Get current progress
     const current = await db.get(`
       SELECT id, attempts, completed, time_spent
@@ -118,9 +118,9 @@ router.post('/:userId/:exerciseId', async (req: Request, res: Response) => {
         (id, user_id, exercise_id, completed, attempts, best_solution, completed_at, time_spent)
         VALUES (?, ?, ?, ?, 1, ?, ?, ?)
       `, [
-        progressId, 
-        userId, 
-        exerciseId, 
+        progressId,
+        userId,
+        exerciseId,
         completed ? 1 : 0,
         solution || null,
         completed ? new Date().toISOString() : null,
